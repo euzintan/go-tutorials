@@ -47,20 +47,30 @@ func getBookByID(id string) (*book, error) {
 }
 
 func checkoutById(c *gin.Context) {
-	targetBook, err := getBookByID(c.Param("id"))
 
-	if err != nil {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "Id of book not found"})
+	// Take note we are getting a query param and not a path param
+	// comes after a ?
+	id, ok := c.GetQuery("id")
+
+	if ok == false {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "Missing ID"})
 		return
 	}
 
-	if targetBook.Quantity <= 0 {
+	book, err := getBookByID(id)
+
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "Book Not Found"})
+		return
+	}
+
+	if book.Quantity <= 0 {
 		c.IndentedJSON(http.StatusOK, gin.H{"message": "No more book available for loan"})
 		return
 	}
 
-	targetBook.Quantity -= 1
-	c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%v has been checked out. There are %v left", targetBook.Title, targetBook.Quantity)})
+	book.Quantity -= 1
+	c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%v has been checked out. There are %v left", book.Title, book.Quantity)})
 }
 
 func createBook(c *gin.Context) {
@@ -78,11 +88,32 @@ func createBook(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, newBook)
 }
 
+func returnBook(c *gin.Context) {
+	id, ok := c.GetQuery("id")
+
+	if ok == false {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "Missing ID"})
+		return
+	}
+
+	book, err := getBookByID(id)
+
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "Book Not Found"})
+		return
+	}
+
+	book.Quantity += 1
+	c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%v has been returned. There are %v left", book.Title, book.Quantity)})
+
+}
+
 func main() {
 	router := gin.Default()
 	router.GET("/books", getBooks)
 	router.GET("/books/:id", bookById)
 	router.POST("/books", createBook)
-	router.POST("/checkout/:id", checkoutById)
+	router.PATCH("/checkout", checkoutById)
+	router.PATCH("/return", returnBook)
 	router.Run("localhost:8080")
 }
