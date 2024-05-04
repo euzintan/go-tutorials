@@ -9,9 +9,14 @@ import (
 
 type question struct {
 	ID                  string   `json: "id"`
-	QuestionDescription string   `json: question_des`
-	Options             []string `json: options`
-	AnswerIndex         int      `json: answer_index`
+	QuestionDescription string   `json: "question_des"`
+	Options             []string `json: "options"`
+	AnswerIndex         int      `json: "answer_index"`
+}
+
+type userAnswer struct {
+	ID     string `json: "id"`
+	Answer int    `json: "answer"`
 }
 
 var questions = []question{
@@ -45,10 +50,34 @@ func getQuestionById(id string) (*question, error) {
 	return nil, fmt.Errorf("Book with ID: %v cannot be found.", id)
 }
 
+func AnswerAQuestion(c *gin.Context) {
+	question, err := getQuestionById(c.Param("id"))
+	var answer userAnswer
+
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": err.Error()})
+		return
+	}
+
+	if err := c.BindJSON(&answer); err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "Poorly formed answer request"})
+		return
+	}
+
+	if question.AnswerIndex == answer.Answer {
+		c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Correct, the answer is %v, %v", answer.ID, question.Options[answer.Answer])})
+	} else if answer.Answer >= len(question.Options) {
+		c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Wrong, %v is not even a valid option", answer.Answer)})
+	} else {
+		c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Wrong, the answer is not %v", question.Options[answer.Answer])})
+	}
+}
+
 func main() {
 	router := gin.Default()
 	router.GET("/questions", GetAllQuestions)
 	router.GET("/questions/:id", GetQuestionById)
+	router.POST("/questions/:id", AnswerAQuestion)
 	router.Run("localhost:8080")
 }
 
