@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,11 +13,6 @@ type question struct {
 	QuestionDescription string   `json: "question_des"`
 	Options             []string `json: "options"`
 	AnswerIndex         int      `json: "answer_index"`
-}
-
-type userAnswer struct {
-	ID     string `json: "id"`
-	Answer int    `json: "answer"`
 }
 
 var questions = []question{
@@ -51,8 +47,12 @@ func getQuestionById(id string) (*question, error) {
 }
 
 func AnswerAQuestion(c *gin.Context) {
-	question, err := getQuestionById(c.Param("id"))
-	var answer userAnswer
+	questionId := c.Param("id")
+	question, err := getQuestionById(questionId)
+
+	var answer struct {
+		AnswerIndex int `json:"answer_idx"`
+	}
 
 	if err != nil {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": err.Error()})
@@ -64,66 +64,50 @@ func AnswerAQuestion(c *gin.Context) {
 		return
 	}
 
-	if question.AnswerIndex == answer.Answer {
-		c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Correct, the answer is %v, %v", answer.ID, question.Options[answer.Answer])})
-	} else if answer.Answer >= len(question.Options) {
-		c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Wrong, %v is not even a valid option", answer.Answer)})
+	if question.AnswerIndex == answer.AnswerIndex {
+		c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Correct, the answer is %v, %v", questionId, question.Options[answer.AnswerIndex])})
+	} else if answer.AnswerIndex >= len(question.Options) {
+		c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Wrong, %v is not even a valid option", answer.AnswerIndex)})
 	} else {
-		c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Wrong, the answer is not %v", question.Options[answer.Answer])})
+		c.IndentedJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Wrong, the answer is not %v", question.Options[answer.AnswerIndex])})
 	}
+}
+
+func CreateAQuestion(c *gin.Context) {
+
+	var submittedQuestion struct {
+		QuestionDescription string   `json:"question_des"`
+		Options             []string `json:"options"`
+		AnswerIndex         int      `json:"answer_index"`
+	}
+
+	if err := c.BindJSON(&submittedQuestion); err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "Poorly formed question"})
+		return
+	}
+
+	if submittedQuestion.AnswerIndex >= len(submittedQuestion.Options) {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "Poorly formed question"})
+		return
+	}
+
+	newQuestion := question{
+		QuestionDescription: submittedQuestion.QuestionDescription,
+		Options:             submittedQuestion.Options,
+		AnswerIndex:         submittedQuestion.AnswerIndex,
+		ID:                  strconv.Itoa(len(questions) + 1),
+	}
+
+	questions = append(questions, newQuestion)
+
+	c.IndentedJSON(http.StatusOK, newQuestion)
 }
 
 func main() {
 	router := gin.Default()
 	router.GET("/questions", GetAllQuestions)
 	router.GET("/questions/:id", GetQuestionById)
-	router.POST("/questions/:id", AnswerAQuestion)
+	router.POST("/questions", CreateAQuestion)
+	router.POST("/answer/:id", AnswerAQuestion)
 	router.Run("localhost:8080")
 }
-
-// var name string
-// var age uint
-// var livesLeft uint = 3
-
-// CheckIfGameOver := func() bool {
-// 	if livesLeft <= 0 {
-// 		fmt.Println("Womp Womp Game Over")
-// 	} else {
-// 		fmt.Printf("You just lost 1 life, you have %v lives left\n", livesLeft)
-// 	}
-// 	return (livesLeft <= 0)
-// }
-
-// fmt.Print("Enter your name: ")
-// fmt.Scan(&name)
-// fmt.Printf("Welcome to my game, %v\nEnter your age: ", name)
-// fmt.Scan(&age)
-
-// if age >= 10 {
-// 	fmt.Printf("%v?! You're old, but wise\n", age)
-// } else {
-// 	fmt.Printf("%v?! too young!\nCome back in %v years\n", age, 10-age)
-// 	return
-// }
-
-// var answer string
-// var ended bool = false
-
-// for !ended {
-// 	fmt.Println("What do you hear first, Lightning or Thunder?")
-
-// 	fmt.Scan(&answer)
-
-// 	if strings.ToUpper(answer) == "LIGHTNING" {
-// 		fmt.Println("Wrong, you can't hear lightning")
-// 		livesLeft--
-// 		ended = CheckIfGameOver()
-// 	} else if strings.ToUpper(answer) == "THUNDER" {
-// 		fmt.Println("Correct!\nCongratulations I'm out of questions for you!")
-// 		return
-// 	} else {
-// 		fmt.Println("That's not one of the options")
-// 		livesLeft--
-// 		ended = CheckIfGameOver()
-// 	}
-// }
