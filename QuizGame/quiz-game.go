@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,13 +22,33 @@ var questions = []question{
 	{ID: "5", QuestionDescription: "What has keys but can’t open locks?", Options: []string{"A Piano", "A Map", "A Secret"}, AnswerIndex: 1},
 }
 
-func getAllQuestions(c *gin.Context) {
+func GetAllQuestions(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, questions)
+}
+
+func GetQuestionById(c *gin.Context) {
+	question, err := getQuestionById(c.Param("id"))
+
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": err.Error()})
+	}
+
+	c.IndentedJSON(http.StatusOK, question)
+}
+
+func getQuestionById(id string) (*question, error) {
+	for i, q := range questions {
+		if q.ID == id {
+			return &questions[i], nil
+		}
+	}
+	return nil, fmt.Errorf("Book with ID: %v cannot be found.", id)
 }
 
 func main() {
 	router := gin.Default()
-	router.GET("/questions", getAllQuestions)
+	router.GET("/questions", GetAllQuestions)
+	router.GET("/questions/:id", GetQuestionById)
 	router.Run("localhost:8080")
 }
 
